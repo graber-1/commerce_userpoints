@@ -1,0 +1,8 @@
+name: 'Commerce Userpoints'
+type: module
+description: 'Intergrates Drupal Commerce with Userpoints 2.x+ by providing a new promotion type.'
+core: 8.x
+package: 'Commerce (contrib)'
+dependencies:
+  - drupal:userpoints (>=2.0)
+  - drupal:commerce_promotion
