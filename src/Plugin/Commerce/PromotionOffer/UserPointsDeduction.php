@@ -1,6 +1,6 @@
 <?php
 
-namespace Drupal\commerce_promotion\Plugin\Commerce\PromotionOffer;
+namespace Drupal\commerce_userpoints\Plugin\Commerce\PromotionOffer;
 
 use Drupal\commerce_promotion\Plugin\Commerce\PromotionOffer\OrderPromotionOfferBase;
 use Drupal\commerce_price\RounderInterface;
@@ -11,6 +11,7 @@ use Drupal\Component\Plugin\Exception\PluginException;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\commerce_promotion\Entity\PromotionInterface;
+use Drupal\commerce_promotion\Entity\CouponInterface;
 
 use Drupal\commerce_order\Adjustment;
 
@@ -75,9 +76,9 @@ class UserPointsDeduction extends OrderPromotionOfferBase {
    */
   public function defaultConfiguration() {
     return [
-      'points_type' => NULL,
+      'points_type' => '',
       'conversion_amount' => 1,
-      'conversion_rate' => NULL,
+      'conversion_rate' => FALSE,
     ] + parent::defaultConfiguration();
   }
 
@@ -129,7 +130,7 @@ class UserPointsDeduction extends OrderPromotionOfferBase {
       '#type' => 'commerce_price',
       '#title' => $this->t('Conversion rate'),
       '#description' => $this->t('The above amount of points will be converted to this amount of currency.'),
-      '#default_value' => $this->getConfigurationItem('conversion_rate'),
+      '#default_value' => empty($this->getConfigurationItem('conversion_rate')) ? NULL : $this->getConfigurationItem('conversion_rate'),
       '#required' => TRUE,
       '#weight' => -1,
     ];
@@ -163,9 +164,13 @@ class UserPointsDeduction extends OrderPromotionOfferBase {
     $this->assertEntity($entity);
     /** @var \Drupal\commerce_order\Entity\OrderInterface $order */
     $order = $entity;
-    $subtotal_price = $order->getSubTotalPrice();
 
-    $points_type = $this->getConfiguration('points_type');
+    // Just pass the enabled info to the inline form.
+    if ($userpoints_type = $this->getConfiguration('points_type')) {
+      $order->setData('userpoints_type', $userpoints_type);
+      $order->save();
+      kdpm('ccc');
+    }
   }
 
 }
