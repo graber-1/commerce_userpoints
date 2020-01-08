@@ -6,3 +6,4 @@ package: 'Commerce (contrib)'
 dependencies:
   - drupal:userpoints (>=2.0)
   - drupal:commerce_promotion
+  - drupal:commerce_price

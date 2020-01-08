@@ -166,10 +166,8 @@ class UserPointsDeduction extends OrderPromotionOfferBase {
     $order = $entity;
 
     // Just pass the enabled info to the inline form.
-    if ($userpoints_type = $this->getConfiguration('points_type')) {
-      $order->setData('userpoints_type', $userpoints_type);
-      $order->save();
-      kdpm('ccc');
+    if ($userpoints_config = $this->getConfiguration()) {
+      $order->setData('userpoints_config', $userpoints_config);
     }
   }
 
