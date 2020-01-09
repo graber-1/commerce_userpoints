@@ -1,0 +1,6 @@
+services:
+  commerce_userpoints.order_subscriber:
+    class: Drupal\commerce_userpoints\EventSubscriber\OrderEventSubscriber
+    arguments: ['@userpoints.points']
+    tags:
+      - { name: event_subscriber }

@@ -13,6 +13,8 @@ use Drupal\commerce_currency_resolver\CurrencyHelper;
 use Drupal\commerce_price\Price;
 use Drupal\commerce_price\RounderInterface;
 use CommerceGuys\Intl\Formatter\CurrencyFormatterInterface;
+use Drupal\commerce_order\PriceSplitterInterface;
+use Drupal\commerce_order\Adjustment;
 
 /**
  * Provides an inline form for paying with userpoints.
@@ -53,6 +55,13 @@ class UserPointsForm extends InlineFormBase {
   protected $currencyFormatter;
 
   /**
+   * A price splitter service.
+   *
+   * @var \Drupal\commerce_order\PriceSplitterInterface
+   */
+  protected $splitter;
+
+  /**
    * Constructs a new CouponRedemption object.
    *
    * @param array $configuration
@@ -69,6 +78,8 @@ class UserPointsForm extends InlineFormBase {
    *   A price rounder service.
    * @param \CommerceGuys\Intl\Formatter\CurrencyFormatterInterface $currency_formatter
    *   A currency formatter service.
+   * @param \Drupal\commerce_order\PriceSplitterInterface $splitter
+   *   A price splitter service.
    */
   public function __construct(
     array $configuration,
@@ -77,7 +88,8 @@ class UserPointsForm extends InlineFormBase {
     EntityTypeManagerInterface $entity_type_manager,
     UserPointsServiceInterface $userpoints,
     RounderInterface $rounder,
-    CurrencyFormatterInterface $currency_formatter
+    CurrencyFormatterInterface $currency_formatter,
+    PriceSplitterInterface $splitter
   ) {
     parent::__construct($configuration, $plugin_id, $plugin_definition);
 
@@ -85,6 +97,7 @@ class UserPointsForm extends InlineFormBase {
     $this->userpoints = $userpoints;
     $this->rounder = $rounder;
     $this->currencyFormatter = $currency_formatter;
+    $this->splitter = $splitter;
   }
 
   /**
@@ -98,7 +111,8 @@ class UserPointsForm extends InlineFormBase {
       $container->get('entity_type.manager'),
       $container->get('userpoints.points'),
       $container->get('commerce_price.rounder'),
-      $container->get('commerce_price.currency_formatter')
+      $container->get('commerce_price.currency_formatter'),
+      $container->get('commerce_order.price_splitter')
     );
   }
 
@@ -151,8 +165,11 @@ class UserPointsForm extends InlineFormBase {
     $inline_form = parent::buildInlineForm($inline_form, $form_state);
 
     $order = $this->entityTypeManager->getStorage('commerce_order')->load($this->configuration['order_id']);
-    assert($order instanceof OrderInterface);
     $userpoints_config = $order->getData('userpoints_config');
+
+    foreach ($order->getItems() as $order_item) {
+      $adjustments = $order_item->getAdjustments();
+    }
 
     if (!empty($userpoints_config) && !empty($userpoints_config['points_type'])) {
       $config = $this->convertConfiguration($userpoints_config, $order);
@@ -160,8 +177,15 @@ class UserPointsForm extends InlineFormBase {
       // Check if the user has any points to exchange for currency.
       $points_count = $this->userpoints->getPoints($order->uid->first()->entity, $config['points_type']);
 
-      $max_currency = new Price($points_count / $config['conversion_amount'] * $config['conversion_rate']->getNumber(), $config['conversion_rate']->getCurrencyCode());
+      $conversion_rate = 1 / ($config['conversion_amount'] * $config['conversion_rate']->getNumber());
+      $max_currency = new Price($points_count * $conversion_rate, $config['conversion_rate']->getCurrencyCode());
       $max_currency = $this->rounder->round($max_currency);
+
+      // Update available points count not to exceed the order total.
+      $subtotal_price = $order->getSubTotalPrice();
+      if ($max_currency->greaterThan($subtotal_price)) {
+        $points_count = ceil($subtotal_price->getNumber() / $conversion_rate);
+      }
 
       if ($max_currency->getNumber() >= 0.01) {
         $inline_form = [
@@ -170,16 +194,18 @@ class UserPointsForm extends InlineFormBase {
         ] + $inline_form;
 
         $points_type = $this->entityTypeManager->getStorage('userpoints_type')->load($config['points_type']);
+        $usage_data = $order->getData('userpoints_usage', []);
 
         $inline_form['userpoints'] = [
           '#type' => 'number',
           '#min' => 0,
           '#max' => $points_count,
           '#step' => 1,
-          '#title' => $this->formatPlural(
+          '#title' => $this->t('Use your points'),
+          '#description' => $this->formatPlural(
             $config['conversion_amount'],
-            'Use the following amount of "@type" points to deduce from order total (@points point = @amount, you have @max points).',
-            'Use the following amount of "@type" points to deduce from order total (@points points = @amount, you have @max points).',
+            'Use the following amount of "@type" points to deduce from order total (@points point = @amount, you can use @max points).',
+            'Use the following amount of "@type" points to deduce from order total (@points points = @amount, you can use @max points).',
             [
               '@type' => $points_type->label(),
               '@points' => $config['conversion_amount'],
@@ -187,7 +213,7 @@ class UserPointsForm extends InlineFormBase {
               '@max' => $points_count,
             ]
           ),
-          '#default_value' => 0,
+          '#default_value' => isset($usage_data[$config['points_type']]) ? $usage_data[$config['points_type']]['count'] : 0,
         ];
         $inline_form['apply'] = [
           '#type' => 'submit',
@@ -225,22 +251,51 @@ class UserPointsForm extends InlineFormBase {
     foreach ($order->getItems() as $order_item) {
       $adjustments = $order_item->getAdjustments();
       foreach ($adjustments as $adjustment) {
-        if ($adjustment->getType() === 'userpoints_deduction' && $adjustment->getSourceId() === $points_type) {
+        if ($adjustment->getType() === 'custom' && $adjustment->getSourceId() === 'userpoints_' . $points_type) {
           $order_item->removeAdjustment($adjustment);
         }
       }
     }
 
+    $config = $this->convertConfiguration($inline_form['#configuration'], $order);
+
     // If userpoints amount is greater than zero - include points.
     $parents[] = 'userpoints';
-    $points_amount = $form_state->getValue($parents);
-    if ($points_amount > 0) {
+    $points_count = $form_state->getValue($parents);
+    if ($points_count > 0) {
+      $conversion_rate = 1 / ($config['conversion_amount'] * $config['conversion_rate']->getNumber());
+      $amount = new Price($points_count * $conversion_rate, $config['conversion_rate']->getCurrencyCode());
+      $subtotal_price = $order->getSubTotalPrice();
 
+      // The promotion amount can't be larger than the subtotal, to avoid
+      // potentially having a negative order total. We already have the
+      // points form element max value but just in case..
+      if ($amount->greaterThan($subtotal_price)) {
+        $amount = $subtotal_price;
+        $points_count = ceil($subtotal_price->getNumber() / $conversion_rate);
+      }
+
+      // Split the amount between order items.
+      $amounts = $this->splitter->split($order, $amount);
+      foreach ($order->getItems() as $order_item) {
+        if (isset($amounts[$order_item->id()])) {
+          $order_item->addAdjustment(new Adjustment([
+            'type' => 'custom',
+            // @todo Change to label from UI when added in #2770731.
+            'label' => $config['label'],
+            'amount' => $amounts[$order_item->id()]->multiply('-1'),
+            'source_id' => 'userpoints_' . $points_type,
+          ]));
+        }
+      }
     }
 
     // Add / update points usage data.
     $usage_data = $order->getData('userpoints_usage', []);
-    $usage_data[$inline_form['#configuration']['points_type']] = $points_amount;
+    $usage_data[$inline_form['#configuration']['points_type']] = [
+      'count' => $points_count,
+      'promotion_label' => $config['label'],
+    ];
     $order->setData('userpoints_usage', $usage_data);
 
     $order->save();

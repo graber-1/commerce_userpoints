@@ -167,6 +167,7 @@ class UserPointsDeduction extends OrderPromotionOfferBase {
 
     // Just pass the enabled info to the inline form.
     if ($userpoints_config = $this->getConfiguration()) {
+      $userpoints_config['label'] = $promotion->getDisplayName();
       $order->setData('userpoints_config', $userpoints_config);
     }
   }
