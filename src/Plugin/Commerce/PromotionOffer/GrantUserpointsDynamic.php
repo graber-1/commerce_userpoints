@@ -3,7 +3,6 @@
 namespace Drupal\commerce_userpoints\Plugin\Commerce\PromotionOffer;
 
 use Drupal\commerce_promotion\Plugin\Commerce\PromotionOffer\OrderPromotionOfferBase;
-use Drupal\commerce_userpoints\Plugin\Commerce\UserpointsDeductionTrait;
 use Drupal\commerce_price\RounderInterface;
 use Drupal\commerce_order\PriceSplitterInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
@@ -13,22 +12,19 @@ use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\commerce_promotion\Entity\PromotionInterface;
 use Drupal\commerce_promotion\Entity\CouponInterface;
-use Drupal\commerce_price\Price;
 
 use Drupal\commerce_order\Adjustment;
 
 /**
- * Provides the userpoints exchange option for orders.
+ * Provides a promotion that gives users points for purchases.
  *
  * @CommercePromotionOffer(
- *   id = "user_points_deduction",
- *   label = @Translation("Deduct from User points to reduce the amount."),
+ *   id = "user_points_grant_dynamic",
+ *   label = @Translation("Add user points basing on the order amount."),
  *   entity_type = "commerce_order",
  * )
  */
-class UserPointsDeduction extends OrderPromotionOfferBase {
-
-  use UserpointsDeductionTrait;
+class GrantUserpointsDynamic extends OrderPromotionOfferBase {
 
   /**
    * The entity type manager.
@@ -38,7 +34,7 @@ class UserPointsDeduction extends OrderPromotionOfferBase {
   protected $entityTypeManager;
 
   /**
-   * Constructs a new UserPointsDeduction object.
+   * Constructs a new OrderPromotionOfferBase object.
    *
    * @param array $configuration
    *   A configuration array containing information about the plugin instance.
@@ -122,7 +118,7 @@ class UserPointsDeduction extends OrderPromotionOfferBase {
     $form['conversion_amount'] = [
       '#type' => 'number',
       '#title' => $this->t('Conversion amount'),
-      '#description' => $this->t('This amount of points will be equal to the below amount of currency.'),
+      '#description' => $this->t('This amount of points will be added on purchase for the below amount of currency.'),
       '#default_value' => $this->getConfigurationItem('conversion_amount'),
       '#required' => TRUE,
       '#weight' => -1,
@@ -131,7 +127,7 @@ class UserPointsDeduction extends OrderPromotionOfferBase {
     $form['conversion_rate'] = [
       '#type' => 'commerce_price',
       '#title' => $this->t('Conversion rate'),
-      '#description' => $this->t('The above amount of points will be converted to this amount of currency.'),
+      '#description' => $this->t('The above amount of points will be added on spending this amount of currency.'),
       '#default_value' => empty($this->getConfigurationItem('conversion_rate')) ? NULL : $this->getConfigurationItem('conversion_rate'),
       '#required' => TRUE,
       '#weight' => -1,
@@ -164,48 +160,12 @@ class UserPointsDeduction extends OrderPromotionOfferBase {
    */
   public function apply(EntityInterface $entity, PromotionInterface $promotion, CouponInterface $coupon = NULL) {
     $this->assertEntity($entity);
-
     /** @var \Drupal\commerce_order\Entity\OrderInterface $order */
     $order = $entity;
 
-    // Pass the enabled info to the inline form.
+    // Just pass the enabled info to the inline form.
     if ($userpoints_config = $this->getConfiguration()) {
-      $order->setData('userpoints_config', $userpoints_config);
-
-      // Apply promotion if order contains userpoints usage data.
-      $usage_data = $order->getData('userpoints_usage', []);
-      if (isset($usage_data[$userpoints_config['points_type']])) {
-        $points_count = &$usage_data[$userpoints_config['points_type']]['count'];
-        $config = $this->convertConfiguration($userpoints_config, $order);
-
-        $conversion_rate = 1 / ($config['conversion_amount'] * $config['conversion_rate']->getNumber());
-        $amount = new Price($points_count * $conversion_rate, $config['conversion_rate']->getCurrencyCode());
-        $subtotal_price = $order->getSubTotalPrice();
-
-        // The promotion amount can't be larger than the subtotal, to avoid
-        // potentially having a negative order total. We already have the
-        // points form element max value but just in case..
-        if ($amount->greaterThan($subtotal_price)) {
-          $amount = $subtotal_price;
-          $points_count = ceil($subtotal_price->getNumber() / $conversion_rate);
-          $order->setData('userpoints_usage', $usage_data);
-        }
-
-        // Split the amount between order items.
-        $amounts = $this->splitter->split($order, $amount);
-        foreach ($order->getItems() as $order_item) {
-          if (isset($amounts[$order_item->id()])) {
-            $order_item->addAdjustment(new Adjustment([
-              'type' => 'promotion',
-              // @todo Change to label from UI when added in #2770731.
-              'label' => $promotion->getDisplayName(),
-              'amount' => $amounts[$order_item->id()]->multiply('-1'),
-              'source_id' => 'userpoints_' . $points_type,
-            ]));
-          }
-        }
-
-      }
+      kdpm($promotion);
     }
   }
 

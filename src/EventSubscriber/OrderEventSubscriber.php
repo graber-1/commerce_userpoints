@@ -39,7 +39,7 @@ class OrderEventSubscriber implements EventSubscriberInterface {
   }
 
   /**
-   * Finalizes the cart when the order is placed.
+   * Deduce userpoints where applicable.
    *
    * @param \Drupal\state_machine\Event\WorkflowTransitionEvent $event
    *   The order state change event.
