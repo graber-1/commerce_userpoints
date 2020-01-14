@@ -3,7 +3,7 @@
 namespace Drupal\commerce_userpoints\Plugin\Commerce\InlineForm;
 
 use Drupal\commerce\Plugin\Commerce\InlineForm\InlineFormBase;
-use Drupal\commerce_userpoints\Plugin\Commerce\UserpointsDeductionTrait;
+use Drupal\commerce_userpoints\Plugin\Commerce\UserpointsPromotionTrait;
 use Drupal\Component\Utility\NestedArray;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\userpoints\Service\UserPointsServiceInterface;
@@ -25,7 +25,7 @@ use Drupal\commerce_order\Adjustment;
  */
 class UserPointsForm extends InlineFormBase {
 
-  use UserpointsDeductionTrait;
+  use UserpointsPromotionTrait;
 
   /**
    * An entity type manager.
@@ -150,7 +150,7 @@ class UserPointsForm extends InlineFormBase {
     }
 
     if (!empty($userpoints_config) && !empty($userpoints_config['points_type'])) {
-      $config = $this->convertConfiguration($userpoints_config, $order);
+      $config = $this->convertConfiguration($userpoints_config, $order->getSubTotalPrice()->getCurrencyCode());
 
       // Check if the user has any points to exchange for currency.
       $points_count = $this->userpoints->getPoints($order->uid->first()->entity, $config['points_type']);

@@ -3,7 +3,7 @@
 namespace Drupal\commerce_userpoints\Plugin\Commerce\PromotionOffer;
 
 use Drupal\commerce_promotion\Plugin\Commerce\PromotionOffer\OrderPromotionOfferBase;
-use Drupal\commerce_userpoints\Plugin\Commerce\UserpointsDeductionTrait;
+use Drupal\commerce_userpoints\Plugin\Commerce\UserpointsPromotionTrait;
 use Drupal\commerce_price\RounderInterface;
 use Drupal\commerce_order\PriceSplitterInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
@@ -28,7 +28,7 @@ use Drupal\commerce_order\Adjustment;
  */
 class UserPointsDeduction extends OrderPromotionOfferBase {
 
-  use UserpointsDeductionTrait;
+  use UserpointsPromotionTrait;
 
   /**
    * The entity type manager.
@@ -176,7 +176,7 @@ class UserPointsDeduction extends OrderPromotionOfferBase {
       $usage_data = $order->getData('userpoints_usage', []);
       if (isset($usage_data[$userpoints_config['points_type']])) {
         $points_count = &$usage_data[$userpoints_config['points_type']]['count'];
-        $config = $this->convertConfiguration($userpoints_config, $order);
+        $config = $this->convertConfiguration($userpoints_config, $order->getSubTotalPrice()->getCurrencyCode());
 
         $conversion_rate = 1 / ($config['conversion_amount'] * $config['conversion_rate']->getNumber());
         $amount = new Price($points_count * $conversion_rate, $config['conversion_rate']->getCurrencyCode());
@@ -200,7 +200,7 @@ class UserPointsDeduction extends OrderPromotionOfferBase {
               // @todo Change to label from UI when added in #2770731.
               'label' => $promotion->getDisplayName(),
               'amount' => $amounts[$order_item->id()]->multiply('-1'),
-              'source_id' => 'userpoints_' . $points_type,
+              'source_id' => 'userpoints_' . $userpoints_config['points_type'],
             ]));
           }
         }

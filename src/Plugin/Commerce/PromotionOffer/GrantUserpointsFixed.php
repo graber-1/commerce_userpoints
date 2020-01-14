@@ -19,12 +19,12 @@ use Drupal\commerce_order\Adjustment;
  * Provides a promotion that gives users points for purchases.
  *
  * @CommercePromotionOffer(
- *   id = "user_points_grant_dynamic",
- *   label = @Translation("Add user points basing on the order amount."),
+ *   id = "user_points_grant_fixed",
+ *   label = @Translation("Add a fixed user points amount per product."),
  *   entity_type = "commerce_order",
  * )
  */
-class GrantUserpointsDynamic extends OrderPromotionOfferBase {
+class GrantUserpointsFixed extends OrderPromotionOfferBase {
 
   /**
    * The entity type manager.
@@ -75,8 +75,7 @@ class GrantUserpointsDynamic extends OrderPromotionOfferBase {
   public function defaultConfiguration() {
     return [
       'points_type' => '',
-      'conversion_amount' => 1,
-      'conversion_rate' => FALSE,
+      'amount' => 1,
     ] + parent::defaultConfiguration();
   }
 
@@ -115,20 +114,11 @@ class GrantUserpointsDynamic extends OrderPromotionOfferBase {
       '#weight' => -1,
     ];
 
-    $form['conversion_amount'] = [
+    $form['amount'] = [
       '#type' => 'number',
       '#title' => $this->t('Conversion amount'),
-      '#description' => $this->t('This amount of points will be added on purchase for the below amount of currency.'),
+      '#description' => $this->t('This amount of points will be added on purchase of a matching product.'),
       '#default_value' => $this->getConfigurationItem('conversion_amount'),
-      '#required' => TRUE,
-      '#weight' => -1,
-    ];
-
-    $form['conversion_rate'] = [
-      '#type' => 'commerce_price',
-      '#title' => $this->t('Conversion rate'),
-      '#description' => $this->t('The above amount of points will be added on spending this amount of currency.'),
-      '#default_value' => empty($this->getConfigurationItem('conversion_rate')) ? NULL : $this->getConfigurationItem('conversion_rate'),
       '#required' => TRUE,
       '#weight' => -1,
     ];
