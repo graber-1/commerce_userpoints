@@ -14,6 +14,7 @@ use Drupal\commerce_promotion\Entity\PromotionInterface;
 use Drupal\commerce_promotion\Entity\CouponInterface;
 
 use Drupal\commerce_order\Adjustment;
+use Drupal\commerce_price\Price;
 
 /**
  * Provides a promotion that gives users points for purchases.
@@ -176,8 +177,11 @@ class GrantUserpointsDynamic extends OrderItemPromotionOfferBase {
 
     $config = $this->convertConfiguration($this->getConfiguration(), $order_item->getUnitPrice()->getCurrencyCode());
     $conversion_rate = $config['conversion_amount'] / $config['conversion_rate']->getNumber();
-    $points_count = floor($unit_price->getNumber() * $conversion_rate);
+    $points_count = floor($unit_price->getNumber() * $quantity * $conversion_rate);
 
+    $grant_data = $order_item->getData('userpoints_grants');
+    $grant_data[$config['points_type']] = $points_count;
+    $order_item->setData('userpoints_grants', $grant_data);
   }
 
 }

@@ -5,6 +5,7 @@ namespace Drupal\commerce_userpoints\EventSubscriber;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Drupal\userpoints\Service\UserPointsServiceInterface;
 use Drupal\state_machine\Event\WorkflowTransitionEvent;
+use Drupal\commerce_order\Event\OrderEvent;
 
 /**
  * Defines the order event subscriber.
@@ -34,6 +35,7 @@ class OrderEventSubscriber implements EventSubscriberInterface {
   public static function getSubscribedEvents() {
     $events = [
       'commerce_order.place.pre_transition' => 'onOrderPlacement',
+      'commerce_order.order.paid' => 'onOrderPaid',
     ];
     return $events;
   }
@@ -63,6 +65,34 @@ class OrderEventSubscriber implements EventSubscriberInterface {
           );
 
           $this->userpoints->addPoints(-$data['count'], $userpoints_type, $user, $log);
+        }
+      }
+    }
+  }
+
+  /**
+   * Handle points addition where applicable.
+   *
+   * @param \Drupal\commerce_order\Event\OrderEvent $event
+   *   The order state change event.
+   */
+  public function onOrderPaid(OrderEvent $event) {
+    $order = $event->getOrder();
+    foreach ($order->getItems() as $order_item) {
+      if ($grant_data = $order_item->getData('userpoints_grants', FALSE)) {
+        foreach ($grant_data as $points_type => $count) {
+          $log = $this->formatPlural(
+            $count,
+            '1 point granted on purchase of @item in order @order_id.',
+            '@quantity points granted on purchase of @item in order @order_id.',
+            [
+              '@item' => $order_item->label(),
+              '@quantity' => $count,
+              '@order_id' => $order->id(),
+            ]
+          );
+
+          $this->userpoints->addPoints($count, $points_type, $order->uid->first()->entity, $log);
         }
       }
     }

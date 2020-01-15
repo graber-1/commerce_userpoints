@@ -179,6 +179,7 @@ class UserPointsDeduction extends OrderPromotionOfferBase {
         $config = $this->convertConfiguration($userpoints_config, $order->getSubTotalPrice()->getCurrencyCode());
 
         $conversion_rate = 1 / ($config['conversion_amount'] * $config['conversion_rate']->getNumber());
+
         $amount = new Price($points_count * $conversion_rate, $config['conversion_rate']->getCurrencyCode());
         $subtotal_price = $order->getSubTotalPrice();
 

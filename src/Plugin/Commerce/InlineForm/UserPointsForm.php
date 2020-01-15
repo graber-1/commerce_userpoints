@@ -145,10 +145,6 @@ class UserPointsForm extends InlineFormBase {
     $order = $this->entityTypeManager->getStorage('commerce_order')->load($this->configuration['order_id']);
     $userpoints_config = $order->getData('userpoints_config');
 
-    foreach ($order->getItems() as $order_item) {
-      $adjustments = $order_item->getAdjustments();
-    }
-
     if (!empty($userpoints_config) && !empty($userpoints_config['points_type'])) {
       $config = $this->convertConfiguration($userpoints_config, $order->getSubTotalPrice()->getCurrencyCode());
 

@@ -2,9 +2,8 @@
 
 namespace Drupal\commerce_userpoints\Plugin\Commerce\PromotionOffer;
 
-use Drupal\commerce_promotion\Plugin\Commerce\PromotionOffer\OrderPromotionOfferBase;
+use Drupal\commerce_promotion\Plugin\Commerce\PromotionOffer\OrderItemPromotionOfferBase;
 use Drupal\commerce_price\RounderInterface;
-use Drupal\commerce_order\PriceSplitterInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Drupal\Component\Plugin\Exception\PluginException;
@@ -24,7 +23,7 @@ use Drupal\commerce_order\Adjustment;
  *   entity_type = "commerce_order",
  * )
  */
-class GrantUserpointsFixed extends OrderPromotionOfferBase {
+class GrantUserpointsFixed extends OrderItemPromotionOfferBase {
 
   /**
    * The entity type manager.
@@ -44,12 +43,10 @@ class GrantUserpointsFixed extends OrderPromotionOfferBase {
    *   The plugin implementation definition.
    * @param \Drupal\commerce_price\RounderInterface $rounder
    *   The rounder.
-   * @param \Drupal\commerce_order\PriceSplitterInterface $splitter
-   *   The splitter.
    * @param \Drupal\Core\Entity\EntityTypeManagerInterface $entityTypeManager
    *   The entity type manager.
    */
-  public function __construct(array $configuration, $plugin_id, $plugin_definition, RounderInterface $rounder, PriceSplitterInterface $splitter, EntityTypeManagerInterface $entityTypeManager) {
+  public function __construct(array $configuration, $plugin_id, $plugin_definition, RounderInterface $rounder, EntityTypeManagerInterface $entityTypeManager) {
     parent::__construct($configuration, $plugin_id, $plugin_definition, $rounder, $splitter);
 
     $this->entityTypeManager = $entityTypeManager;
@@ -64,7 +61,6 @@ class GrantUserpointsFixed extends OrderPromotionOfferBase {
       $plugin_id,
       $plugin_definition,
       $container->get('commerce_price.rounder'),
-      $container->get('commerce_order.price_splitter'),
       $container->get('entity_type.manager')
     );
   }
@@ -150,13 +146,14 @@ class GrantUserpointsFixed extends OrderPromotionOfferBase {
    */
   public function apply(EntityInterface $entity, PromotionInterface $promotion, CouponInterface $coupon = NULL) {
     $this->assertEntity($entity);
-    /** @var \Drupal\commerce_order\Entity\OrderInterface $order */
-    $order = $entity;
+    /* @var \Drupal\commerce_order\Entity\OrderInterface $order */
+    $order_item = $entity;
 
-    // Just pass the enabled info to the inline form.
-    if ($userpoints_config = $this->getConfiguration()) {
-      kdpm($promotion);
-    }
+    $config = $this->getConfigurationItem();
+
+    $grant_data = $order_item->getData('userpoints_grants', []);
+    $grant_data[$this->getConfigurationItem('points_type')] = $this->getConfigurationItem('amount') * $order_item->getQuantity();
+    $order_item->setData('userpoints_grants', $grant_data);
   }
 
 }
