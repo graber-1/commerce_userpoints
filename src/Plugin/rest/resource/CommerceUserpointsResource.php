@@ -181,7 +181,7 @@ class CommerceUserpointsResource extends ResourceBase {
       return $this->invalidRequest('Invalid "points_type" parameter.');
     }
 
-    if (empty($data['amount']) || !preg_match('/^[0-9]*$/', $data['amount'])) {
+    if (!isset($data['amount']) || !preg_match('/^[0-9]*$/', $data['amount'])) {
       return $this->invalidRequest('"amount" parameter not provided or invalid.');
     }
 
@@ -205,20 +205,23 @@ class CommerceUserpointsResource extends ResourceBase {
     if ($this->userpoints->getPoints($data['order']->uid->first()->entity, $data['points_type']) < $data['amount']) {
       return $this->invalidRequest(sprintf("User %d doesn't have %d %s type userpoints.", $data['order']->uid->first()->target_id, $data['amount'], $data['points_type']));
     }
+
+    return TRUE;
   }
 
   /**
    * POST method callback.
    */
   public function post(array $data) {
-    $this->checkRequest($data);
+    $result = $this->checkRequest($data);
+    if ($result !== TRUE) {
+      return $result;
+    }
 
     $usage_data = $data['order']->getData('userpoints_usage', []);
     if ($data['amount']) {
-      $usage_data[$data['points_type']] = [
-        'count' => $data['amount'],
-      ];
-      $message = 'Userpoints set to be deduced from order total.';
+      $usage_data[$data['points_type']]['count'] = $data['amount'];
+      $message = sprintf('%d %s type userpoints set to be deduced from order total.', $data['amount'], $data['points_type']);
     }
     else {
       unset($usage_data[$data['points_type']]);
@@ -226,6 +229,7 @@ class CommerceUserpointsResource extends ResourceBase {
     }
 
     $data['order']->setData('userpoints_usage', $usage_data);
+    $data['order']->save();
 
     return new ModifiedResourceResponse($message, 200);
   }
