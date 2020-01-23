@@ -3,6 +3,7 @@
 namespace Drupal\commerce_userpoints\EventSubscriber;
 
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
+use Drupal\Core\StringTranslation\StringTranslationTrait;
 use Drupal\userpoints\Service\UserPointsServiceInterface;
 use Drupal\state_machine\Event\WorkflowTransitionEvent;
 use Drupal\commerce_order\Event\OrderEvent;
@@ -11,6 +12,8 @@ use Drupal\commerce_order\Event\OrderEvent;
  * Defines the order event subscriber.
  */
 class OrderEventSubscriber implements EventSubscriberInterface {
+
+  use StringTranslationTrait;
 
   /**
    * The order integrator service.
